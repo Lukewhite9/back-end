@@ -5,29 +5,24 @@ const Database = require('@replit/database');
 const cors = require('cors');
 
 const client = new Client();
-const db = new Database(process.env.REPLIT_DB_URL); // Pass the REPLIT_DB_URL to the Database constructor
+const db = new Database(process.env.REPLIT_DB_URL);
 const app = express();
 
 const { WORDNIK_API_KEY } = process.env;
 
-app.use(cors()); // Enable CORS for all routes
+app.use(cors());
+app.use(express.json());
 
-app.use(express.json()); // Parse JSON request bodies
-
-// Add a leaderboard entry
 app.post('/leaderboard', async (req, res) => {
   try {
     const { name, score, time } = req.body;
 
-    // Validate the request data
     if (!name || !score || !time) {
       return res.status(400).json({ message: 'Missing required fields' });
     }
 
-    // Create a unique key for the entry
     const entryId = generateEntryId();
 
-    // Store the entry in the database
     await db.set(entryId, { name, score, time });
 
     return res.status(201).json({ message: 'Leaderboard entry added successfully' });
@@ -37,19 +32,14 @@ app.post('/leaderboard', async (req, res) => {
   }
 });
 
-// Get leaderboard entries
 app.get('/leaderboard', async (req, res) => {
   try {
-    // Get all keys in the database
     const keys = await db.list();
-
-    // Retrieve the entries for each key
     const entries = await Promise.all(keys.map(async (key) => {
       const entry = await db.get(key);
       return entry;
     }));
 
-    // Sort the entries by score in descending order
     const sortedEntries = entries.sort((a, b) => b.score - a.score);
 
     return res.status(200).json(sortedEntries);
@@ -59,11 +49,24 @@ app.get('/leaderboard', async (req, res) => {
   }
 });
 
+app.get('/definition/:word', async (req, res) => {
+  try {
+    const { word } = req.params;
+
+    const response = await fetch(`https://api.wordnik.com/v4/word.json/${word}/definitions?limit=3&includeRelated=false&sourceDictionaries=ahd-5&useCanonical=false&includeTags=false&api_key=${WORDNIK_API_KEY}`);
+    const data = await response.json();
+
+    res.status(200).json(data);
+  } catch (error) {
+    console.error('Error fetching definition:', error);
+    return res.status(500).json({ message: 'Failed to fetch definition' });
+  }
+});
+
 app.listen(3000, () => {
   console.log('Server is running on port 3000');
 });
 
-// Generate a unique entry ID
 function generateEntryId() {
   return Date.now().toString();
 }
