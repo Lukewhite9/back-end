@@ -44,13 +44,15 @@ app.get('/leaderboard', async (req, res) => {
 
     // Filter keys for the current date
     const currentDate = getCurrentDate();
-    const filteredKeys = keys.filter((key) => {
+    const filteredKeys = await Promise.all(keys.map(async (key) => {
       const entry = await db.get(key);
-      return entry.date === currentDate;
-    });
+      return entry.date === currentDate ? key : null;
+    }));
+
+    const validKeys = filteredKeys.filter((key) => key !== null);
 
     // Retrieve the entries for each key
-    const entries = await Promise.all(filteredKeys.map(async (key) => {
+    const entries = await Promise.all(validKeys.map(async (key) => {
       const entry = await db.get(key);
       return entry;
     }));
